@@ -129,10 +129,8 @@ while task.wait(1) do
 
             local embedColor = mutation and COLORS.orange or tierColor
 
-            -- Build fields matching the screenshot style
             local fields = {}
 
-            -- Row 1: You | Brainrot
             table.insert(fields, {
                 name = "👤 You",
                 value = string.format("Display: `%s`\nUser: `%s`", lp.DisplayName, lp.Name),
@@ -144,7 +142,6 @@ while task.wait(1) do
                 inline = true
             })
 
-            -- Row 2: Mutation / Trait / Rarity if any
             if mutation then
                 table.insert(fields, {
                     name = "🧬 Mutation",
@@ -167,7 +164,6 @@ while task.wait(1) do
                 })
             end
 
-            -- Winnings field (like the screenshot)
             table.insert(fields, {
                 name = "💰 Winnings",
                 value = string.format("```diff\n+ %s coins\n```", short(bestVal)),
@@ -181,16 +177,14 @@ while task.wait(1) do
                         Method = "POST",
                         Headers = {["Content-Type"] = "application/json"},
                         Body = Http:JSONEncode({
-                            username = "Steal A Brainrot",
                             embeds = {{
                                 title = string.format("🏆 DUEL VICTORY 🏆"),
-                                description = string.format("other soul has been shit on by `%s` 💩", lp.DisplayName),
+                                description = string.format("this player has been shit on by Nova 💩"),
                                 color = embedColor,
                                 fields = fields,
                                 footer = {
-                                    text = string.format("Powered by %s • %s", lp.DisplayName, os.date("%m/%d/%y, %I:%M %p"))
-                                },
-                                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                                    text = "Powered by Nova Duels"
+                                }
                             }}
                         })
                     })
