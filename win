@@ -1,0 +1,291 @@
+local Players = game:GetService("Players")
+local Http = game:GetService("HttpService")
+local lp = Players.LocalPlayer
+local req = request or http_request or (syn and syn.request)
+
+local hook = "https://discord.com/api/webhooks/1519063574855680191/7behx22zXdRuPO56qZHd-Q6Ia11i1ta12-uXbM4sDnYuscLlFsFLoFUYTjE3Tjr8u9US"
+
+local p3 = Vector3.new(-476.752, 10.464, 7.107)
+local p7 = Vector3.new(-476.752, 10.464, 114.107)
+
+-- Color palette
+local COLORS = {
+    win = 0x00FF88,      -- Green for wins
+    steal = 0xFF4444,    -- Red for steals
+    legendary = 0xFFD700, -- Gold for high value
+    rare = 0x9B59B6,      -- Purple for rare
+    common = 0x3498DB,    -- Blue for common
+    mutation = 0xFF6B35   -- Orange for mutations
+}
+
+local function num(v)
+    v = tostring(v):gsub("%s", "")
+    local n, s = v:match("([%d%.]+)(%a?)")
+    n = tonumber(n) or 0
+
+    if s == "K" or s == "k" then
+        n *= 1e3
+    elseif s == "M" or s == "m" then
+        n *= 1e6
+    elseif s == "B" or s == "b" then
+        n *= 1e9
+    elseif s == "T" or s == "t" then
+        n *= 1e12
+    end
+
+    return n
+end
+
+local function short(n)
+    if n >= 1e12 then
+        return string.format("%.2fT", n / 1e12)
+    elseif n >= 1e9 then
+        return string.format("%.2fB", n / 1e9)
+    elseif n >= 1e6 then
+        return string.format("%.2fM", n / 1e6)
+    elseif n >= 1e3 then
+        return string.format("%.2fK", n / 1e3)
+    end
+    return tostring(math.floor(n))
+end
+
+-- Get value tier for color coding
+local function getTier(val)
+    if val >= 1e12 then return "LEGENDARY", COLORS.legendary, "👑"
+    elseif val >= 1e9 then return "MYTHIC", COLORS.legendary, "💎"
+    elseif val >= 1e6 then return "EPIC", COLORS.rare, "🔮"
+    elseif val >= 1e3 then return "RARE", COLORS.rare, "⭐"
+    else return "COMMON", COLORS.common, "📦" end
+end
+
+local function myPlot()
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") and v.Name == "PlotSign" then
+            local d3 = (v.Position - p3).Magnitude
+            local d7 = (v.Position - p7).Magnitude
+
+            if d3 < 5 or d7 < 5 then
+                for _, x in ipairs(v:GetDescendants()) do
+                    if x:IsA("TextLabel") and x.Text ~= "" then
+                        if x.Text:find(lp.Name) or x.Text:find(lp.DisplayName) then
+                            return d3 < 5 and 3 or 7
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Extract mutation/trait info from SurfaceGui
+local function getMutationInfo(sg)
+    local mutation = nil
+    local trait = nil
+    local rarity = nil
+    
+    -- Scan all descendants for mutation indicators
+    for _, child in ipairs(sg:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local text = child.Text:lower()
+            
+            -- Common mutation keywords in Steal a Brainrot
+            if text:find("mutated") or text:find("mutation") or text:find("mutant") then
+                mutation = child.Text
+            end
+            
+            -- Trait indicators
+            if text:find("trait") or text:find("ability") or text:find("passive") then
+                trait = child.Text
+            end
+            
+            -- Rarity indicators
+            if text:find("rarity") or text:find("tier") then
+                rarity = child.Text
+            end
+        end
+        
+        -- Check for ImageLabel with mutation icons
+        if child:IsA("ImageLabel") and child.Visible then
+            -- Mutation icons often have specific image IDs
+            local imgId = tostring(child.Image)
+            if imgId:find("mutation") or imgId:find("mutant") then
+                mutation = mutation or "Mutated"
+            end
+        end
+    end
+    
+    return mutation, trait, rarity
+end
+
+-- Get additional brainrot details
+local function getBrainrotDetails(sg)
+    local details = {}
+    
+    for _, child in ipairs(sg:GetDescendants()) do
+        if child:IsA("TextLabel") then
+            local text = child.Text
+            -- Skip already known fields
+            if text ~= "" and not text:find("Generation") and not text:find("DisplayName") 
+               and not text:find(lp.Name) and not text:find(lp.DisplayName) then
+                -- Look for level, power, or other stats
+                if text:find("Lv") or text:find("Level") or text:find("Power") 
+                   or text:find("Damage") or text:find("Speed") then
+                    table.insert(details, text)
+                end
+            end
+        end
+    end
+    
+    return details
+end
+
+local last, lastVal, lastTick = "", 0, 0
+local sessionWins = 0
+local totalValue = 0
+
+while task.wait(1) do
+    local mine = myPlot()
+    if not mine then continue end
+
+    local pos = mine == 3 and p7 or p3
+    local best, bestVal, bestSG
+
+    local db = workspace:FindFirstChild("Debris")
+    if not db then continue end
+
+    for _, v in ipairs(db:GetChildren()) do
+        if v.Name ~= "FastOverheadTemplate" then
+            continue
+        end
+
+        local sg = v:FindFirstChildOfClass("SurfaceGui")
+        if not sg or not sg.Adornee then
+            continue
+        end
+
+        if (sg.Adornee.Position - pos).Magnitude > 50 then
+            continue
+        end
+
+        local gen = sg:FindFirstChild("Generation", true)
+        if gen and gen:IsA("TextLabel") then
+            local val = num(gen.Text)
+
+            if not bestVal or val > bestVal then
+                bestVal = val
+                bestSG = sg
+
+                local dn = sg:FindFirstChild("DisplayName", true)
+                best = dn and dn.Text or v.Name
+            end
+        end
+    end
+
+    if best and bestVal and bestSG then
+        if (best ~= last or bestVal ~= lastVal) and tick() - lastTick > 8 then
+            last = best
+            lastVal = bestVal
+            lastTick = tick()
+            sessionWins += 1
+            totalValue += bestVal
+
+            local tierName, tierColor, tierEmoji = getTier(bestVal)
+            local mutation, trait, rarity = getMutationInfo(bestSG)
+            local details = getBrainrotDetails(bestSG)
+            
+            -- Build rich fields array
+            local fields = {
+                {
+                    name = "👤 Player Info",
+                    value = string.format("**Display:** %s\n**User:** %s\n**Plot:** %s", 
+                        lp.DisplayName, lp.Name, mine == 3 and "Plot 3" or "Plot 7"),
+                    inline = true
+                },
+                {
+                    name = "🧠 Brainrot",
+                    value = string.format("**Name:** %s\n**Value:** %s\n**Tier:** %s %s", 
+                        best, short(bestVal), tierEmoji, tierName),
+                    inline = true
+                }
+            }
+            
+            -- Add mutation info if found
+            if mutation then
+                table.insert(fields, {
+                    name = "🧬 Mutation",
+                    value = mutation,
+                    inline = true
+                })
+            end
+            
+            -- Add trait info if found
+            if trait then
+                table.insert(fields, {
+                    name = "⚡ Trait",
+                    value = trait,
+                    inline = true
+                })
+            end
+            
+            -- Add rarity if found
+            if rarity then
+                table.insert(fields, {
+                    name = "🏷️ Rarity",
+                    value = rarity,
+                    inline = true
+                })
+            end
+            
+            -- Add extra details
+            if #details > 0 then
+                table.insert(fields, {
+                    name = "📊 Stats",
+                    value = table.concat(details, " | "),
+                    inline = false
+                })
+            end
+            
+            -- Add session stats
+            table.insert(fields, {
+                name = "📈 Session Stats",
+                value = string.format("**Wins:** %d\n**Total Value:** %s", 
+                    sessionWins, short(totalValue)),
+                inline = true
+            })
+
+            -- Determine embed color based on mutation + value
+            local embedColor = tierColor
+            if mutation then
+                embedColor = COLORS.mutation
+            end
+
+            if req then
+                pcall(function()
+                    req({
+                        Url = hook,
+                        Method = "POST",
+                        Headers = {["Content-Type"] = "application/json"},
+                        Body = Http:JSONEncode({
+                            username = "🧠 Brainrot Logger",
+                            avatar_url = "https://cdn.discordapp.com/attachments/0/0/brainrot.png",
+                            embeds = {{
+                                title = string.format("%s DUEL WON!", tierEmoji),
+                                description = string.format("Successfully stole **%s** worth **%s**!", best, short(bestVal)),
+                                color = embedColor,
+                                fields = fields,
+                                thumbnail = {
+                                    url = "https://cdn.discordapp.com/attachments/0/0/brainrot_thumb.png"
+                                },
+                                footer = {
+                                    text = string.format("🕐 %s | Session #%d", os.date("%H:%M:%S"), sessionWins),
+                                    icon_url = "https://cdn.discordapp.com/attachments/0/0/clock.png"
+                                },
+                                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                            }}
+                        })
+                    })
+                end)
+            end
+        end
+    end
+end
