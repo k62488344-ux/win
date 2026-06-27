@@ -8,54 +8,41 @@ local hook = "https://discord.com/api/webhooks/1519063574855680191/7behx22zXdRuP
 local p3 = Vector3.new(-476.752, 10.464, 7.107)
 local p7 = Vector3.new(-476.752, 10.464, 114.107)
 
--- Color palette
 local COLORS = {
-    win = 0x00FF88,      -- Green for wins
-    steal = 0xFF4444,    -- Red for steals
-    legendary = 0xFFD700, -- Gold for high value
-    rare = 0x9B59B6,      -- Purple for rare
-    common = 0x3498DB,    -- Blue for common
-    mutation = 0xFF6B35   -- Orange for mutations
+    gold = 0xFFD700,
+    green = 0x2ECC71,
+    red = 0xE74C3C,
+    blue = 0x3498DB,
+    purple = 0x9B59B6,
+    orange = 0xFF6B35,
+    gray = 0x95A5A6
 }
 
 local function num(v)
     v = tostring(v):gsub("%s", "")
     local n, s = v:match("([%d%.]+)(%a?)")
     n = tonumber(n) or 0
-
-    if s == "K" or s == "k" then
-        n *= 1e3
-    elseif s == "M" or s == "m" then
-        n *= 1e6
-    elseif s == "B" or s == "b" then
-        n *= 1e9
-    elseif s == "T" or s == "t" then
-        n *= 1e12
-    end
-
+    if s == "K" or s == "k" then n *= 1e3
+    elseif s == "M" or s == "m" then n *= 1e6
+    elseif s == "B" or s == "b" then n *= 1e9
+    elseif s == "T" or s == "t" then n *= 1e12 end
     return n
 end
 
 local function short(n)
-    if n >= 1e12 then
-        return string.format("%.2fT", n / 1e12)
-    elseif n >= 1e9 then
-        return string.format("%.2fB", n / 1e9)
-    elseif n >= 1e6 then
-        return string.format("%.2fM", n / 1e6)
-    elseif n >= 1e3 then
-        return string.format("%.2fK", n / 1e3)
-    end
+    if n >= 1e12 then return string.format("%.2fT", n / 1e12)
+    elseif n >= 1e9 then return string.format("%.2fB", n / 1e9)
+    elseif n >= 1e6 then return string.format("%.2fM", n / 1e6)
+    elseif n >= 1e3 then return string.format("%.2fK", n / 1e3) end
     return tostring(math.floor(n))
 end
 
--- Get value tier for color coding
 local function getTier(val)
-    if val >= 1e12 then return "LEGENDARY", COLORS.legendary, "👑"
-    elseif val >= 1e9 then return "MYTHIC", COLORS.legendary, "💎"
-    elseif val >= 1e6 then return "EPIC", COLORS.rare, "🔮"
-    elseif val >= 1e3 then return "RARE", COLORS.rare, "⭐"
-    else return "COMMON", COLORS.common, "📦" end
+    if val >= 1e12 then return "LEGENDARY", COLORS.gold, "👑"
+    elseif val >= 1e9 then return "MYTHIC", COLORS.purple, "💎"
+    elseif val >= 1e6 then return "EPIC", COLORS.blue, "🔮"
+    elseif val >= 1e3 then return "RARE", COLORS.green, "⭐"
+    else return "COMMON", COLORS.gray, "📦" end
 end
 
 local function myPlot()
@@ -63,7 +50,6 @@ local function myPlot()
         if v:IsA("BasePart") and v.Name == "PlotSign" then
             local d3 = (v.Position - p3).Magnitude
             local d7 = (v.Position - p7).Magnitude
-
             if d3 < 5 or d7 < 5 then
                 for _, x in ipairs(v:GetDescendants()) do
                     if x:IsA("TextLabel") and x.Text ~= "" then
@@ -77,71 +63,32 @@ local function myPlot()
     end
 end
 
--- Extract mutation/trait info from SurfaceGui
 local function getMutationInfo(sg)
-    local mutation = nil
-    local trait = nil
-    local rarity = nil
-    
-    -- Scan all descendants for mutation indicators
+    local mutation, trait, rarity = nil, nil, nil
     for _, child in ipairs(sg:GetDescendants()) do
         if child:IsA("TextLabel") or child:IsA("TextButton") then
             local text = child.Text:lower()
-            
-            -- Common mutation keywords in Steal a Brainrot
             if text:find("mutated") or text:find("mutation") or text:find("mutant") then
                 mutation = child.Text
             end
-            
-            -- Trait indicators
             if text:find("trait") or text:find("ability") or text:find("passive") then
                 trait = child.Text
             end
-            
-            -- Rarity indicators
             if text:find("rarity") or text:find("tier") then
                 rarity = child.Text
             end
         end
-        
-        -- Check for ImageLabel with mutation icons
         if child:IsA("ImageLabel") and child.Visible then
-            -- Mutation icons often have specific image IDs
             local imgId = tostring(child.Image)
             if imgId:find("mutation") or imgId:find("mutant") then
                 mutation = mutation or "Mutated"
             end
         end
     end
-    
     return mutation, trait, rarity
 end
 
--- Get additional brainrot details
-local function getBrainrotDetails(sg)
-    local details = {}
-    
-    for _, child in ipairs(sg:GetDescendants()) do
-        if child:IsA("TextLabel") then
-            local text = child.Text
-            -- Skip already known fields
-            if text ~= "" and not text:find("Generation") and not text:find("DisplayName") 
-               and not text:find(lp.Name) and not text:find(lp.DisplayName) then
-                -- Look for level, power, or other stats
-                if text:find("Lv") or text:find("Level") or text:find("Power") 
-                   or text:find("Damage") or text:find("Speed") then
-                    table.insert(details, text)
-                end
-            end
-        end
-    end
-    
-    return details
-end
-
 local last, lastVal, lastTick = "", 0, 0
-local sessionWins = 0
-local totalValue = 0
 
 while task.wait(1) do
     local mine = myPlot()
@@ -154,27 +101,17 @@ while task.wait(1) do
     if not db then continue end
 
     for _, v in ipairs(db:GetChildren()) do
-        if v.Name ~= "FastOverheadTemplate" then
-            continue
-        end
-
+        if v.Name ~= "FastOverheadTemplate" then continue end
         local sg = v:FindFirstChildOfClass("SurfaceGui")
-        if not sg or not sg.Adornee then
-            continue
-        end
-
-        if (sg.Adornee.Position - pos).Magnitude > 50 then
-            continue
-        end
+        if not sg or not sg.Adornee then continue end
+        if (sg.Adornee.Position - pos).Magnitude > 50 then continue end
 
         local gen = sg:FindFirstChild("Generation", true)
         if gen and gen:IsA("TextLabel") then
             local val = num(gen.Text)
-
             if not bestVal or val > bestVal then
                 bestVal = val
                 bestSG = sg
-
                 local dn = sg:FindFirstChild("DisplayName", true)
                 best = dn and dn.Text or v.Name
             end
@@ -186,78 +123,56 @@ while task.wait(1) do
             last = best
             lastVal = bestVal
             lastTick = tick()
-            sessionWins += 1
-            totalValue += bestVal
 
             local tierName, tierColor, tierEmoji = getTier(bestVal)
             local mutation, trait, rarity = getMutationInfo(bestSG)
-            local details = getBrainrotDetails(bestSG)
-            
-            -- Build rich fields array
-            local fields = {
-                {
-                    name = "👤 Player Info",
-                    value = string.format("**Display:** %s\n**User:** %s\n**Plot:** %s", 
-                        lp.DisplayName, lp.Name, mine == 3 and "Plot 3" or "Plot 7"),
-                    inline = true
-                },
-                {
-                    name = "🧠 Brainrot",
-                    value = string.format("**Name:** %s\n**Value:** %s\n**Tier:** %s %s", 
-                        best, short(bestVal), tierEmoji, tierName),
-                    inline = true
-                }
-            }
-            
-            -- Add mutation info if found
-            if mutation then
-                table.insert(fields, {
-                    name = "🧬 Mutation",
-                    value = mutation,
-                    inline = true
-                })
-            end
-            
-            -- Add trait info if found
-            if trait then
-                table.insert(fields, {
-                    name = "⚡ Trait",
-                    value = trait,
-                    inline = true
-                })
-            end
-            
-            -- Add rarity if found
-            if rarity then
-                table.insert(fields, {
-                    name = "🏷️ Rarity",
-                    value = rarity,
-                    inline = true
-                })
-            end
-            
-            -- Add extra details
-            if #details > 0 then
-                table.insert(fields, {
-                    name = "📊 Stats",
-                    value = table.concat(details, " | "),
-                    inline = false
-                })
-            end
-            
-            -- Add session stats
+
+            local embedColor = mutation and COLORS.orange or tierColor
+
+            -- Build fields matching the screenshot style
+            local fields = {}
+
+            -- Row 1: You | Brainrot
             table.insert(fields, {
-                name = "📈 Session Stats",
-                value = string.format("**Wins:** %d\n**Total Value:** %s", 
-                    sessionWins, short(totalValue)),
+                name = "👤 You",
+                value = string.format("Display: `%s`\nUser: `%s`", lp.DisplayName, lp.Name),
+                inline = true
+            })
+            table.insert(fields, {
+                name = "🧠 Brainrot",
+                value = string.format("`%s`", best),
                 inline = true
             })
 
-            -- Determine embed color based on mutation + value
-            local embedColor = tierColor
+            -- Row 2: Mutation / Trait / Rarity if any
             if mutation then
-                embedColor = COLORS.mutation
+                table.insert(fields, {
+                    name = "🧬 Mutation",
+                    value = string.format("`%s`", mutation),
+                    inline = true
+                })
             end
+            if trait then
+                table.insert(fields, {
+                    name = "⚡ Trait",
+                    value = string.format("`%s`", trait),
+                    inline = true
+                })
+            end
+            if rarity then
+                table.insert(fields, {
+                    name = "🏷️ Rarity",
+                    value = string.format("`%s`", rarity),
+                    inline = true
+                })
+            end
+
+            -- Winnings field (like the screenshot)
+            table.insert(fields, {
+                name = "💰 Winnings",
+                value = string.format("```diff\n+ %s coins\n```", short(bestVal)),
+                inline = false
+            })
 
             if req then
                 pcall(function()
@@ -266,19 +181,14 @@ while task.wait(1) do
                         Method = "POST",
                         Headers = {["Content-Type"] = "application/json"},
                         Body = Http:JSONEncode({
-                            username = "🧠 Brainrot Logger",
-                            avatar_url = "https://cdn.discordapp.com/attachments/0/0/brainrot.png",
+                            username = "Steal A Brainrot",
                             embeds = {{
-                                title = string.format("%s DUEL WON!", tierEmoji),
-                                description = string.format("Successfully stole **%s** worth **%s**!", best, short(bestVal)),
+                                title = string.format("🏆 DUEL VICTORY 🏆"),
+                                description = string.format("other soul has been shit on by `%s` 💩", lp.DisplayName),
                                 color = embedColor,
                                 fields = fields,
-                                thumbnail = {
-                                    url = "https://cdn.discordapp.com/attachments/0/0/brainrot_thumb.png"
-                                },
                                 footer = {
-                                    text = string.format("🕐 %s | Session #%d", os.date("%H:%M:%S"), sessionWins),
-                                    icon_url = "https://cdn.discordapp.com/attachments/0/0/clock.png"
+                                    text = string.format("Powered by %s • %s", lp.DisplayName, os.date("%m/%d/%y, %I:%M %p"))
                                 },
                                 timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
                             }}
